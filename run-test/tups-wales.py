@@ -30,11 +30,12 @@ ref_bitstr = '110011001100' # initial bit string to specify occupancy of orbital
 perm = [0,5,1,4,2,3] # permutation to rearrange orbitals when perfect_pair==True, optional
 # perm = None
 # perm = [0,3,1,4,2,5]
-tups = Ansatz_tUPS(mol=mol, layers=2, oo_layers=3, use_random_angles=False, use_small_perturb_angles=True, use_mp2_guess=False, 
+tups = Ansatz_tUPS(mol=mol, layers=1, oo_layers=0, use_random_angles=False, use_small_perturb_angles=True, use_mp2_guess=False, 
                     use_projection=False, use_mat_mul=True, perfect_pair=True, ref_bitstring=ref_bitstr, mo_perm=perm,
-                    init_ham=False, init_rdm=False,
+                    init_ham=False, init_rdm=False, 
                     )
-setup(tups, path=OUTPUT_DIR, temp=0.05, tightconv=5e-7, sloppyconv=1e-7,)
+setup(tups, path=OUTPUT_DIR, tightconv=5e-7, sloppyconv=1e-7,
+       bhpt=True, pt_tempmin=0.001, pt_tempmax=1, replicas=8, steps=250)
 
 
 

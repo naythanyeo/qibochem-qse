@@ -1,0 +1,71 @@
+Starting parallel execution: Processor         1 of          1
+ keywords> initialising quantum computing analysis
+io1> Initial coordinates (top 100):
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000        0.0000000000        0.0000000000
+        0.0000000000
+ 120 QC parameters
+io1> checking the energy of the saved coordinates in the chain
+In run   1 temperature will be fixed - see below for value
+BH perturbation range and angular threshold will be adjusted for acceptance ratio       0.5000 initial values=      1.0000      0.5000
+Minimum and maximum values for Cartesian coordinate step size:      0.000000000        0.1000000000+101
+Configuration will be reset to quench geometry
+Sampling using Boltzmann weights
+Nocedal LBFGS minimisation
+Number of updates before reset in LBFGS=    10
+Maximum LBFGS step size=        0.4000000000
+Guess for initial diagonal elements in LBFGS=  0.1000    
+Sloppy quench tolerance for RMS gradient     0.1000000000E-06
+Final  quench tolerance for RMS gradient     0.5000000000E-06
+Energy difference criterion for minima=        0.0000010000
+Maximum number of iterations: sloppy quenches ***** final quenches *****
+Run   1:        50 steps with temperature scaled by  0.10000000E+01
+Debug printing is on
+Maximum allowed energy rise during a minimisation=    0.1000000000E-05
+MPIERR=     0
+NPAR,MPIERR=     1     0
+In mc after MPI_MPI_COMM_RANK MPIERR,MYNODE,JP=     0     0     1
+Processor         1 of         1 speaking:
+Number of atoms       120
+mc> Calculating initial energy
+mc> calling initial quench
+mylbfgs> Resetting LBFGS minimiser
+Energy and RMS force=     1.29600116387498        0.5799066918E-01 after      0 LBFGS steps
+mymylbfgs> Energy and RMS force=     1.26830183740563        0.6765619498E-01 after      1 LBFGS steps, step: 0.0403550125
+mymylbfgs> skipping bad curvature pair:    -0.4052706264E-02
+mymylbfgs> Energy and RMS force=     1.20580847397532        0.8735413815E-01 after      2 LBFGS steps, step: 0.0741136483
+mymylbfgs> skipping bad curvature pair:    -0.1467102602E-01
+mymylbfgs> Energy and RMS force=     1.09945141374043        0.1171573562     after      3 LBFGS steps, step: 0.0956916639
+mymylbfgs> skipping bad curvature pair:    -0.2862410937E-01
+mymylbfgs> Energy and RMS force=    0.904360644315054        0.1620014834     after      4 LBFGS steps, step: 0.1283394535

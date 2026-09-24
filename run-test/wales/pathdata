@@ -9,7 +9,7 @@ COPYFILES qc_ucc_hamiltonian.dat qc_ucc_index.dat qc_ucc_initial.dat qc_ucc.dat
 COPYFILES qc_ucc_order.dat
 EXEC $OPTIM_PATH
 SYSTEM         QC
-NATOMS         45
+NATOMS         15
 SEED           1
 PERTURB        2.5
 DIRECTION      AB
@@ -21,7 +21,7 @@ ITOL           10.1D0
 
 QCUCC
 QCORDER
-QC1            12 45
+QC1            12 15
 CHECKPATHINFO
 
 ADDMIN min.data.info.test

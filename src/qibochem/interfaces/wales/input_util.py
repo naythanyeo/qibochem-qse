@@ -34,9 +34,11 @@ def gen_hamiltonian(obj, path=Path.cwd()):
     np.savetxt(index_file_path, np.column_stack((rows + 1, columns + 1)), fmt="%d")
 
 # save the null vector
-def gen_coords(obj, path=Path.cwd()):
+def gen_coords(obj, path=Path.cwd(), replicas=1):
     file_path = path / "coords"
-    np.savetxt(file_path, np.zeros(len(obj.param_names)), delimiter="\n", fmt='%0.0f')
+    np.savetxt(file_path, np.zeros(len(obj.param_names)*replicas), delimiter="\n", fmt='%0.0f')
+    if replicas > 1:
+        np.savetxt(path / "coords.single", np.zeros(len(obj.param_names)), delimiter="\n", fmt='%0.0f')
 
 # save op order
 def gen_order(obj, path=Path.cwd()):
@@ -103,6 +105,38 @@ TEMPERATURE {temp}
 STEP {step[0]} {step[1]}
 ! FIXSTEP
 ! TRACKDATA
+! DUMP
+! DEBUG
+
+ANSATZ
+QCUCC
+QCORDER
+QC1 {obj.n_active_spin}
+QCPERIODIC''')
+
+def gen_bhpt_data(obj, path=Path.cwd(), pt_tempmin=0.1, pt_tempmax=1, 
+             sloppyconv=1e-6, tightconv=1e-7, 
+             save=1000, ediff=1e-6, updates=10, 
+             maxerise=1e-6, maxit=10000, 
+             step=(1.0, 0.5), steps=10000, tfac=1.0, ):
+    file_path = path / "data"
+    with open(file_path, 'w') as f:
+        f.write(
+f'''MPI
+BHPT {pt_tempmin} {pt_tempmax} 10 interval sets
+! RADIUS 1.0D10
+! CHECKD
+SLOPPYCONV {fortran_float(sloppyconv)}
+TIGHTCONV {fortran_float(tightconv)}
+SAVE {save}
+EDIFF {fortran_float(ediff)}
+UPDATES {updates}
+MAXERISE {fortran_float(maxerise)}
+MAXIT {maxit} {maxit}
+STEPS {steps} {tfac}
+STEP {step[0]} {step[1]}
+! FIXSTEP
+TRACKDATA
 ! DUMP
 ! DEBUG
 
@@ -213,16 +247,25 @@ ADDMIN min.data.info.test
 ! EXTRACTMINFILE''')
 
 
-def setup(obj, path=Path.cwd(), temp=1, tightconv=1e-7, 
-          sloppyconv=1e-6, save=10000, ediff=1e-6, 
+def setup(obj, path=Path.cwd(), bhpt=False, temp=1,
+          pt_tempmin=0.1, pt_tempmax=1, tightconv=1e-7, 
+          sloppyconv=1e-6, save=1000, ediff=1e-6, 
           updates=10, maxerise=1e-6, maxit=100000, 
-          steps=10000, step=(1.0,0.5), tfac=1.0):
+          steps=10000, step=(1.0,0.5), tfac=1.0,
+          replicas=1):
+    path.mkdir(parents=True, exist_ok=True)
     gen_hamiltonian(obj, path)
-    gen_coords(obj, path)
+    gen_coords(obj, path, replicas)
     gen_order(obj, path)
     gen_excitations(obj, path)
     gen_initial(obj, path)
-    gen_data(obj, path, temp=temp, tightconv=tightconv, 
+    if bhpt is True:
+        gen_bhpt_data(obj, path, pt_tempmin=pt_tempmin, pt_tempmax=pt_tempmax,
+                    tightconv=tightconv, sloppyconv=sloppyconv, save=save, ediff=ediff, 
+                    updates=updates, maxerise=maxerise, maxit=maxit, 
+                    steps=steps, step=step, tfac=tfac)
+    else:
+        gen_data(obj, path, temp=temp, tightconv=tightconv, 
              sloppyconv=sloppyconv, save=save, ediff=ediff, 
              updates=updates, maxerise=maxerise, maxit=maxit, 
              steps=steps, step=step, tfac=tfac)
