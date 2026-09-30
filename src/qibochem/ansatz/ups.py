@@ -156,18 +156,6 @@ class UPSAnsatz(UCCAnsatz):
             self.h_indices[:,t] = indices
             self.h_phases[:,t] = phases
 
-
-    # def _apply_ham_observables(self, state):
-    #     '''Apply the Hamiltonian on the wave function, psi, as a sum of observables.
-    #     Returns h_psi: H|psi>'''
-    #     psi = self.proj_mat @ state if self.use_projection else state # transform to full Fock space
-    #     hpsi = self.h_observable.constant * psi
-
-    #     for coeff, indices, phases in self.h_actions:
-    #         hpsi += coeff * phases * psi[indices]
-
-    #     return self.proj_mat.T @ hpsi if self.use_projection else hpsi
-
     def _apply_ham_observables(self, state):
         '''Apply the Hamiltonian on the wave function, psi, as a sum of observables.
         Returns h_psi: H|psi>'''
@@ -484,6 +472,32 @@ class UPSAnsatz(UCCAnsatz):
         gradient = self._pack_rotations(self.orbital_gradient(g_fock))
         return self.energy, gradient
 
+    def _combined_objective(self, params):
+        ansatz_params = params[:self.dim]
+        orb_params = params[self.dim:]
+        self.kappa_old = self.kappa
+        self.kappa = self._unpack_rotations(orb_params, self.n_spat)
+
+        self.mol.ca = self.mol.ca @ expm(self.kappa-self.kappa_old)
+
+        self.mol.hf_embedding(
+            active=self.mol.active,
+            frozen=self.mol.frozen
+        )
+        self._initialise_ham_observables()
+        self._update_observables(ansatz_params)
+        ansatz_gradient = self.gradient.copy()
+
+        self.get_spat_1rdm()
+        self.get_spat_2rdm()
+        g_fock = self._generalised_fock_matrix()
+        orb_gradient = self._pack_rotations(self.orbital_gradient(g_fock))
+
+        gradient = np.concatenate((ansatz_gradient,orb_gradient))
+
+        self.energy = self._energy_from_rdms()
+        return self.energy, gradient
+
     def run_oo(self, method="L-BFGS-B", callback=None):
         self.get_spat_1rdm()
         self.get_spat_2rdm()
@@ -614,6 +628,44 @@ class UPSAnsatz(UCCAnsatz):
             "vqe_method": "L-BFGS-B",
             "gtol": options['gtol'],
             "method": "quantum_oo-vqe"
+        }
+
+
+    def run_oo_vqe_combined(self, vqe_callback=None, options=None):
+        '''Function to run alternating vqe and oo together in 1 step'''
+        prev_energy = None
+        self.total_vqe_iterations = 0
+        self.total_vqe_evaluations = 0
+
+        n_orbital_params = self.n_spat * (self.n_spat - 1) // 2
+        self.kappa = self._unpack_rotations(np.zeros(n_orbital_params), self.n_spat)
+        initial_params = np.concatenate((self.theta_vector,np.zeros(n_orbital_params)))
+        energy, optimised_params, extra = optimize(
+            self._combined_objective,
+            initial_params,
+            method='L-BFGS-B',
+            callback=vqe_callback,
+            jac=True
+        )
+        self.vqe_result = extra
+        energy = self.energy
+        self.params = self._vector2params(optimised_params[:self.dim])
+        self.total_vqe_iterations += int(self.vqe_result.nit)
+        self.total_vqe_evaluations += int(self.vqe_result.nfev)
+
+
+        self.run_summary = {
+            "energy": float(self.energy),
+            "layers": self.layers,
+            "oo-layers": self.oo_layers,
+            "initial_params": self.initial_params,
+            "final_params": self.params,
+            "vqe_iterations": self.total_vqe_iterations,
+            "vqe_energy_evaluations": self.total_vqe_evaluations,
+            "vqe_method": "L-BFGS-B",
+            "gtol": options['gtol'],
+            "method": "classical_oo-vqe_comb",
+            "mo_coefficients": self.mol.ca.tolist(),
         }
         
 
