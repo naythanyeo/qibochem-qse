@@ -2,10 +2,12 @@ from qibochem.ansatz.ucc import UCCAnsatz
 import numpy as np
 from dataclasses import dataclass, field
 from qibochem.ansatz.ucc_util import excitation2qubit_observable
+from qibochem.ansatz.ucc_fast_eval import get_pauli_action, apply_cached_ham_observables
 from openfermion.linalg import get_sparse_operator
 from openfermion import FermionOperator, jordan_wigner
 from qibo.optimizers import optimize
 from qibochem.driver.hamiltonian import _qubit_hamiltonian
+from qibochem.driver.observables import qubit_operator2observable
 from qibochem.measurement.protocol import StateVectorProtocol
 from scipy.sparse.linalg import expm_multiply
 from scipy.linalg import expm
@@ -52,11 +54,13 @@ class UPSAnsatz(UCCAnsatz):
 
             self._generate_operator_matrix()
 
-            self._initialise_hamiltonian()
+            # self._initialise_hamiltonian()
+            self._initialise_ham_observables()
 
             self.theta_vector = np.array([self.initial_params[name] for name in self.param_names])
 
-            self._update_mat_mul(self.theta_vector)
+            # self._update_mat_mul(self.theta_vector)
+            self._update_observables(self.theta_vector)
 
             self._initialise_rdm_ops()
 
@@ -108,6 +112,76 @@ class UPSAnsatz(UCCAnsatz):
         if self.use_projection:
             self.h_mat = self.proj_mat.T @ (self.h_mat @ self.proj_mat)
 
+    def _initialise_ham_observables(self):
+        '''Function to create a the molecular hamiltonian as the sum of Pauli strings.
+        Perfect pairing reorders the molecular coefficient indices as given by mo_perm.
+        Using projection reduces the dim of the wavefunction Fock space but does not change
+        the Hamiltonian in the Pauli string basis.
+        The indices, phases and coefficients are initialised here as they do not depend on the wave function.
+        '''
+        if not self.perfect_pair:
+            qubit_ham = self.mol.hamiltonian('qubit', ferm_qubit_map=self.ferm_qubit_map)
+
+        else:
+            if self.mo_perm is None:
+                self.mo_perm = [0 for _ in range(self.n_active_spat)]
+                i = 0
+                for _ in range(0,self.n_active_spat,2):
+                    self.mo_perm[_] = i
+                    i += 1
+
+                for _ in range(self.n_active_spat-1-self.n_active_spat % 2, 0, -2):
+                    self.mo_perm[_] = i
+                    i += 1
+            if len(self.mo_perm) != self.n_active_spat:
+                raise ValueError("Length of permutation list does not equal the number of spatial orbitals!")
+
+            oei = self.mol.embed_oei
+            tei = self.mol.embed_tei
+            oei_pp = oei[np.ix_(self.mo_perm, self.mo_perm)]
+            tei_pp = tei[np.ix_(self.mo_perm, self.mo_perm, self.mo_perm, self.mo_perm)]
+            qubit_ham = self.mol.hamiltonian('qubit', ferm_qubit_map=self.ferm_qubit_map, oei=oei_pp, tei=tei_pp)
+        self.h_observable = qubit_operator2observable(qubit_ham,n_qubits=self.n_active_spin)
+
+        N = 2**self.n_active_spin
+        basis_states = np.arange(N)
+        terms = list(self.h_observable.terms.items())
+        self.h_coefficients = np.empty(len(terms), dtype=np.complex128)
+        self.h_indices = np.empty((N, len(terms)), dtype=np.int64)
+        self.h_phases = np.empty((N, len(terms)), dtype=np.complex64)
+
+        for t, (term, coeff) in enumerate(terms):
+            indices, phases = get_pauli_action(term, basis_states)
+            self.h_coefficients[t] = coeff
+            self.h_indices[:,t] = indices
+            self.h_phases[:,t] = phases
+
+
+    # def _apply_ham_observables(self, state):
+    #     '''Apply the Hamiltonian on the wave function, psi, as a sum of observables.
+    #     Returns h_psi: H|psi>'''
+    #     psi = self.proj_mat @ state if self.use_projection else state # transform to full Fock space
+    #     hpsi = self.h_observable.constant * psi
+
+    #     for coeff, indices, phases in self.h_actions:
+    #         hpsi += coeff * phases * psi[indices]
+
+    #     return self.proj_mat.T @ hpsi if self.use_projection else hpsi
+
+    def _apply_ham_observables(self, state):
+        '''Apply the Hamiltonian on the wave function, psi, as a sum of observables.
+        Returns h_psi: H|psi>'''
+        psi = self.proj_mat @ state if self.use_projection else state # transform to full Fock space
+        hpsi = apply_cached_ham_observables(
+            psi,
+            complex(self.h_observable.constant),
+            self.h_coefficients,
+            self.h_indices,
+            self.h_phases,
+        )
+
+        return self.proj_mat.T @ hpsi if self.use_projection else hpsi
+
     def _generate_operator_matrix(self):
         '''Function to generate the excitation operator matrices for multiplication later during
         the update step.
@@ -135,7 +209,7 @@ class UPSAnsatz(UCCAnsatz):
 
         self.wfn = self.hf_ref.copy()
 
-        grad_wfn = np.zeros((N, self.dim))
+        grad_wfn = np.zeros((N, self.dim),dtype=np.complex128)
         for j in range(grad_wfn.shape[1]):
             grad_wfn[:,j] = self.hf_ref.copy()
 
@@ -147,6 +221,29 @@ class UPSAnsatz(UCCAnsatz):
         self.gradient = 2 * np.real(np.conj(grad_wfn).T @ self.h_mat @ self.wfn)
         self.energy = np.real(np.conj(self.wfn).T @ (self.h_mat @ self.wfn))
 
+    def _update_observables(self, theta_vector):
+        '''Function to update wave function, energy and gradient during optimisation.
+        Using the analytical gradient speeds up the optimisation as using the numerical gradient is slower.'''
+
+        if self.use_projection: # use smaller dimension if projected
+            N = self.proj_N
+        else:
+            N = self.N
+
+        self.wfn = self.hf_ref.copy()
+
+        grad_wfn = np.zeros((N, self.dim),dtype=np.complex128)
+        for j in range(grad_wfn.shape[1]):
+            grad_wfn[:,j] = self.hf_ref.copy()
+
+        for idx, name in enumerate(self.param_names):
+            grad_wfn = expm_multiply(self.operator_mat_dict[name[1:4]] * theta_vector[idx], grad_wfn)
+            grad_wfn[:,idx] = self.operator_mat_dict[name[1:4]] @ grad_wfn[:,idx]
+            self.wfn = expm_multiply(self.operator_mat_dict[name[1:4]] * theta_vector[idx], self.wfn)
+        h_wfn = self._apply_ham_observables(self.wfn)
+        self.gradient = 2 * np.real(np.conj(grad_wfn).T @ h_wfn)
+        self.energy = np.real(np.conj(self.wfn).T @ h_wfn)
+
 
     @property
     def dim(self):
@@ -155,7 +252,8 @@ class UPSAnsatz(UCCAnsatz):
 
     def _get_fast_mat_mul_energy(self, x):
         '''loss function called during optimisation'''
-        self._update_mat_mul(x)
+        # self._update_mat_mul(x)
+        self._update_observables(x)
         return (self.energy, self.gradient)
 
     def _initialise_projection_mat(self):
@@ -400,8 +498,9 @@ class UPSAnsatz(UCCAnsatz):
             jac=True
         )
         self._orbital_objective(optimised_params)
-        self._initialise_hamiltonian()
-        self.energy = np.vdot(self.wfn, self.h_mat @ self.wfn).real
+        # self._initialise_hamiltonian()
+        self._initialise_ham_observables()
+        self._update_observables(optimised_params)
         self.oo_result = extra
         return self.energy, optimised_params
 

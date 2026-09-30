@@ -8,6 +8,7 @@ evaluations of the UCC circuit, fast eval is generally recommended
 """
 
 import numpy as np
+from numba import njit, prange
 
 
 def get_hf_bit_state(n_qubits, n_elec):
@@ -56,3 +57,22 @@ def apply_ucc_rotations(state, theta_vector, rotations):
         )
 
     return evolved_state
+
+@njit(parallel=True, cache=True)
+def apply_cached_ham_observables(psi, constant, coefficients, indices, phases):
+    hpsi = np.empty(psi.size, dtype=np.complex128)
+
+    # Parallelize over output amplitudes to avoid competing writes.
+    for i in prange(psi.size):
+        value = constant * psi[i]
+
+        for t in range(coefficients.size):
+            value += (
+                coefficients[t]
+                * phases[i, t]
+                * psi[indices[i, t]]
+            )
+
+        hpsi[i] = value
+
+    return hpsi
