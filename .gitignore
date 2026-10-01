@@ -168,5 +168,6 @@ psi4_output.dat
 .vscode/
 
 .DS_Store
-
-/src/wales/
+# submodules
+src/wales/*
+!src/wales/.gitkeep

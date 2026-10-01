@@ -29,6 +29,8 @@ class UPSAnsatz(UCCAnsatz):
     perfect_pair: bool = False
     oo_layers: str | int = 0
     mo_perm: list | None = None
+    init_ham: bool = False # True if using sparse Hamiltonian matrix, False if using the Pauli string observables or for softwarewales output
+    init_rdm: bool = True
 
     def __post_init__(self):
         self.n_spat = self.mol.norb
@@ -54,15 +56,22 @@ class UPSAnsatz(UCCAnsatz):
 
             self._generate_operator_matrix()
 
-            # self._initialise_hamiltonian()
-            self._initialise_ham_observables()
+            self._initialise_mo_perm()
+            
+            if self.init_ham:
+                self._initialise_hamiltonian()
+            else:
+                self._initialise_ham_observables()
 
             self.theta_vector = np.array([self.initial_params[name] for name in self.param_names])
 
-            # self._update_mat_mul(self.theta_vector)
-            self._update_observables(self.theta_vector)
+            if self.init_ham:
+                self._update_mat_mul(self.theta_vector)
+            else:
+                self._update_observables(self.theta_vector)
 
-            self._initialise_rdm_ops()
+            if self.init_rdm:
+                self._initialise_rdm_ops()
 
 
     def _initialise_reference(self):
@@ -91,19 +100,6 @@ class UPSAnsatz(UCCAnsatz):
         if not self.perfect_pair:
             self.h_mat = get_sparse_operator(self.mol.hamiltonian('qubit', ferm_qubit_map=self.ferm_qubit_map))
         else:
-            if self.mo_perm is None:
-                self.mo_perm = [0 for _ in range(self.n_active_spat)]
-                i = 0
-                for _ in range(0,self.n_active_spat,2):
-                    self.mo_perm[_] = i
-                    i += 1
-
-                for _ in range(self.n_active_spat-1-self.n_active_spat % 2, 0, -2):
-                    self.mo_perm[_] = i
-                    i += 1
-            if len(self.mo_perm) != self.n_active_spat:
-                raise ValueError("Length of permutation list does not equal the number of spatial orbitals!")
-
             oei = self.mol.embed_oei
             tei = self.mol.embed_tei
             oei_pp = oei[np.ix_(self.mo_perm, self.mo_perm)]
@@ -169,6 +165,20 @@ class UPSAnsatz(UCCAnsatz):
         )
 
         return self.proj_mat.T @ hpsi if self.use_projection else hpsi
+    
+    def _initialise_mo_perm(self):
+        if self.mo_perm is None:
+            self.mo_perm = [0 for _ in range(self.n_active_spat)]
+            i = 0
+            for _ in range(0,self.n_active_spat,2):
+                self.mo_perm[_] = i
+                i += 1
+            for _ in range(self.n_active_spat-1-self.n_active_spat % 2, 0, -2):
+                self.mo_perm[_] = i
+                i += 1
+        if len(self.mo_perm) != self.n_active_spat:
+                raise ValueError("Length of permutation list does not equal the number of spatial orbitals!")
+
 
     def _generate_operator_matrix(self):
         '''Function to generate the excitation operator matrices for multiplication later during
@@ -287,6 +297,10 @@ class UPSAnsatz(UCCAnsatz):
         self.o_rdm_ops = {}
         self.t_rdm_ops = {}
         chi = {}
+        if self.use_projection:
+            N = self.proj_N
+        else:
+            N = self.N    
         for p in range(self.n_active_spat):
             for q in range(self.n_active_spat):
                 # 1-RDM
@@ -310,7 +324,7 @@ class UPSAnsatz(UCCAnsatz):
             for q in range(self.n_active_spat):
                 for r in range(self.n_active_spat):
                     for s in range(self.n_active_spat):
-                        rdm_op = csc_matrix((self.proj_N, self.proj_N),dtype=complex)
+                        rdm_op = csc_matrix((N, N),dtype=complex)
                         for tau in range(2):
                             for sigma in range(2):
                                 rdm_op += chi[p,q,tau,sigma].conj().T @ chi[r,s,tau,sigma]

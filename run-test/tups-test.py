@@ -6,8 +6,6 @@ from qibochem.ansatz.ups import Ansatz_tUPS
 from qibochem.measurement.protocol import StateVectorProtocol
 from qibochem.scripts.script_utils import load_molecule
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-OUTPUT_DIR = SCRIPT_DIR / "data" / "output"
 
 np.set_printoptions(precision=5, suppress=True)
 
@@ -39,7 +37,6 @@ sv_protocol = StateVectorProtocol()
 num_active_e = 6
 num_active_o = 6
 molecule_name = 'h6'
-n_layers = 1
 input_dir = "./data/"
 mol = load_molecule(
             SCRIPT_DIR / 'data' / '28_mols' / f"{molecule_name}.xyz",
@@ -59,9 +56,9 @@ perm = [0,5,1,4,2,3]
 # perm = None
 # perm = [0,3,1,4,2,5]
 # initial_guess = np.fromstring(array_text, sep=' ')
-tups = Ansatz_tUPS(mol=mol, layers=1, oo_layers=0, use_random_angles=True, use_mp2_guess=False, 
-                    use_projection=True, use_mat_mul=True, perfect_pair=True, 
-                    ref_bitstring=ref_bitstr, mo_perm=perm, use_small_perturb_angles=False
+tups = Ansatz_tUPS(mol=mol, layers=1, oo_layers=0, use_random_angles=True, use_small_perturb_angles=False,
+                   use_mp2_guess=False, use_projection=True, use_mat_mul=True, perfect_pair=True, 
+                    ref_bitstring=ref_bitstr, mo_perm=perm,
                     )
 # tups.run_oo_vqe_alternating(vqe_callback=vqe_callback, oo_callback=oo_callback, options={'gtol': 1e-6})
 tups.run_oo_vqe_combined(vqe_callback=vqe_callback, options={'gtol': 1e-6})

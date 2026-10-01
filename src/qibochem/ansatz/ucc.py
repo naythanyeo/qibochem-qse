@@ -112,7 +112,7 @@ class UCCAnsatz:
             elif self.use_random_angles and not self.random_oo_angles:
                 self.initial_params = {name: (rng.random()-0.5)*np.pi*2 if 'oo' not in name else 0.0 for name in self.param_names }
             elif self.use_random_angles:
-                self.initial_params = {name: (rng.random()-0.5)*np.pi*2 for name in self.param_names }
+                self.initial_params = {name: (rng.random()-0.5)*np.pi*2 for name in self.param_names}
             elif self.use_small_perturb_angles:
                 self.initial_params = {name: (rng.random()-0.5)*np.pi*2*0.05 for name in self.param_names}
             elif self.initial_angles is not None:
