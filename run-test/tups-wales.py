@@ -4,7 +4,7 @@ import numpy as np
 from qibochem.ansatz.ups import Ansatz_tUPS
 from qibochem.measurement.protocol import StateVectorProtocol
 from qibochem.scripts.script_utils import load_molecule
-from qibochem.interfaces.wales.input_util import setup
+from qibochem.interfaces.wales.input_util import setup_wales
 
 np.set_printoptions(precision=5, suppress=True)
 
@@ -34,7 +34,7 @@ tups = Ansatz_tUPS(mol=mol, layers=2, oo_layers=3, use_random_angles=False, use_
                     use_projection=False, use_mat_mul=True, perfect_pair=True, ref_bitstring=ref_bitstr, mo_perm=perm,
                     init_ham=False, init_rdm=False,
                     )
-setup(tups, path=OUTPUT_DIR, temp=0.05, tightconv=5e-7, sloppyconv=1e-7,)
+setup_wales(tups, path=OUTPUT_DIR, temp=0.05, tightconv=5e-7, sloppyconv=1e-7,)
 
 
 

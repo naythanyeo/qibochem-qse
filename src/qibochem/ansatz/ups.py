@@ -276,10 +276,10 @@ class UPSAnsatz(UCCAnsatz):
                         s[i] = '1'
                     bitstrings.append(int("".join(s),2))
         else:
-            # get combinations of allowed bitstrings that conserves only particle number
+            # get permutations of allowed bitstrings that conserves only particle number
             perm_str = '1'*self.n_active_elec + '0'*(self.n_active_spin-self.n_active_elec)
             perms = tuple(set(itertools.permutations(perm_str)))
-            bitstrings = [''.join(x) for x in perms]
+            bitstrings = [int(''.join(x), 2) for x in perms]
         bitstrings.sort()
         # construct projector matrix and dimension of reduced space
         self.proj_mat = lil_matrix((self.N, len(bitstrings)))
@@ -454,9 +454,7 @@ class UPSAnsatz(UCCAnsatz):
         indices = np.triu_indices(n_orbitals, k=1)
 
         if vector.size != len(indices[0]):
-            raise ValueError(
-                f"Expected {len(indices[0])} values, got {vector.size}."
-            )
+            raise ValueError(f"Expected {len(indices[0])} values, got {vector.size}.")
 
         kappa = np.zeros((n_orbitals, n_orbitals),dtype=vector.dtype)
         kappa[indices] = vector

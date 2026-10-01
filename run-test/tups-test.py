@@ -56,12 +56,12 @@ perm = [0,5,1,4,2,3]
 # perm = None
 # perm = [0,3,1,4,2,5]
 # initial_guess = np.fromstring(array_text, sep=' ')
-tups = Ansatz_tUPS(mol=mol, layers=1, oo_layers=0, use_random_angles=True, use_small_perturb_angles=False,
+tups = Ansatz_tUPS(mol=mol, layers=2, oo_layers=0, use_random_angles=False, use_small_perturb_angles=False,
                    use_mp2_guess=False, use_projection=True, use_mat_mul=True, perfect_pair=True, 
                     ref_bitstring=ref_bitstr, mo_perm=perm,
                     )
-# tups.run_oo_vqe_alternating(vqe_callback=vqe_callback, oo_callback=oo_callback, options={'gtol': 1e-6})
-tups.run_oo_vqe_combined(vqe_callback=vqe_callback, options={'gtol': 1e-6})
+tups.run_oo_vqe_alternating(vqe_callback=vqe_callback, oo_callback=oo_callback, options={'gtol': 1e-6})
+# tups.run_oo_vqe_combined(vqe_callback=vqe_callback, options={'gtol': 1e-6})
 
     # if converged is True:
     #     break

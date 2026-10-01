@@ -1,7 +1,8 @@
 import numpy as np
-from scipy.sparse import csc_matrix, save_npz
 from pathlib import Path
 import openfermion
+import itertools
+from scipy.sparse import lil_matrix
 from openfermion.linalg import get_sparse_operator
 from qibochem.driver.hamiltonian import _fermionic_hamiltonian, _qubit_hamiltonian
 from qibochem.interfaces.wales.fortran_helpers import fortran_float
@@ -14,7 +15,7 @@ def gen_hamiltonian(obj, path=Path.cwd()):
         perfect_pair = obj.perfect_pair
     except:
         perfect_pair = False
-    if obj.perfect_pair:
+    if perfect_pair:
         oei = obj.mol.embed_oei
         tei = obj.mol.embed_tei
         oei_pp = oei[np.ix_(obj.mo_perm, obj.mo_perm)]
@@ -24,6 +25,9 @@ def gen_hamiltonian(obj, path=Path.cwd()):
         ferm_op = obj.mol.hamiltonian("ferm")
     blocked_ferm_op = openfermion.transforms.reorder(ferm_op, openfermion.utils.up_then_down, num_modes=obj.n_active_spin)
     blocked_h_mat = get_sparse_operator(openfermion.transforms.jordan_wigner(blocked_ferm_op), n_qubits=obj.n_active_spin)
+    
+    proj_mat = _get_block_projection_matrix(obj)
+    blocked_h_mat = proj_mat @ (proj_mat.T @ blocked_h_mat @ proj_mat) @ proj_mat.T
 
 
     rows, columns = blocked_h_mat.nonzero()
@@ -32,6 +36,36 @@ def gen_hamiltonian(obj, path=Path.cwd()):
     np.savetxt(hamiltonian_file_path, values, fmt="%.20f")
 
     np.savetxt(index_file_path, np.column_stack((rows + 1, columns + 1)), fmt="%d")
+
+def _get_block_projection_matrix(obj):
+    '''initialise projection matrix for reducing dimension from Fock space 
+    to the smaller Hillbert space with constant quantum numbers (particle, spin).
+    Reduces the number of elements saved in the Hamiltonian file.
+    Different from the projection matrix in the UPS ansatz as the input
+    requires blocked order. 
+    Eg. 11001100 for 2 alpha and 2 beta electrons in 4 spatial orbitals.
+    '''
+    bitstrings = []
+
+    if obj.spin_preserving:
+        # get permutations of allowed bitstrings that conserves spin and particle number
+        alpha_str = '1'*obj.n_active_alpha + '0'*(obj.n_active_spat-obj.n_active_alpha)
+        beta_str = '1'*obj.n_active_beta + '0'*(obj.n_active_spat-obj.n_active_beta)
+        alpha_perms = tuple(set(itertools.permutations(alpha_str)))
+        beta_perms = tuple(set(itertools.permutations(beta_str)))
+        perms = list("".join(a+b) for a,b in itertools.product(alpha_perms, beta_perms))
+    else:
+        # get permutations of allowed bitstrings that conserves only particle number
+        perm_str = '1'*obj.n_active_elec + '0'*(obj.n_active_spin-obj.n_active_elec)
+        perms = tuple(set(itertools.permutations(perm_str)))
+    bitstrings = [''.join(x) for x in perms]
+    bitstrings.sort()
+    # construct projector matrix and dimension of reduced space
+    proj_mat = lil_matrix((obj.N, len(bitstrings)))
+    for j, idx in enumerate(bitstrings):
+        proj_mat[int(idx,2),j] = 1
+    proj_mat = proj_mat.tocsc()
+    return proj_mat
 
 # save the null vector
 def gen_coords(obj, path=Path.cwd()):
@@ -213,7 +247,7 @@ ADDMIN min.data.info.test
 ! EXTRACTMINFILE''')
 
 
-def setup(obj, path=Path.cwd(), temp=1, tightconv=1e-7, 
+def setup_wales(obj, path=Path.cwd(), temp=1, tightconv=1e-7, 
           sloppyconv=1e-6, save=10000, ediff=1e-6, 
           updates=10, maxerise=1e-6, maxit=100000, 
           steps=10000, step=(1.0,0.5), tfac=1.0):
