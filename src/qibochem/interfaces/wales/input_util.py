@@ -281,7 +281,7 @@ ADDMIN min.data.info.test
 ! EXTRACTMINFILE''')
 
 
-def setup(obj, path=Path.cwd(), bhpt=False, temp=1,
+def setup_wales(obj, path=Path.cwd(), bhpt=False, temp=1,
           pt_tempmin=0.1, pt_tempmax=1, tightconv=1e-7, 
           sloppyconv=1e-6, save=1000, ediff=1e-6, 
           updates=10, maxerise=1e-6, maxit=100000, 
