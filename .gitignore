@@ -171,3 +171,4 @@ psi4_output.dat
 # submodules
 src/wales/*
 !src/wales/.gitkeep
+run-test/wales/*
