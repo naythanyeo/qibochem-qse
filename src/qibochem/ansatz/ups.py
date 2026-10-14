@@ -223,23 +223,25 @@ class UPSAnsatz(UCCAnsatz):
         '''Function to update wave function, energy and gradient during optimisation.
         Using the analytical gradient speeds up the optimisation as using the numerical gradient is slower.'''
 
-        if self.use_projection: # use smaller dimension if projected
-            N = self.proj_N
-        else:
-            N = self.N
-
         self.wfn = self.hf_ref.copy()
-
-        grad_wfn = np.zeros((N, self.dim),dtype=np.complex128)
-        for j in range(grad_wfn.shape[1]):
-            grad_wfn[:,j] = self.hf_ref.copy()
+        self.gradient = np.zeros(self.dim)
 
         for idx, name in enumerate(self.param_names):
-            grad_wfn = expm_multiply(self.operator_mat_dict[name[1:4]] * theta_vector[idx], grad_wfn)
-            grad_wfn[:,idx] = self.operator_mat_dict[name[1:4]] @ grad_wfn[:,idx]
             self.wfn = expm_multiply(self.operator_mat_dict[name[1:4]] * theta_vector[idx], self.wfn)
+        
         h_wfn = self._apply_ham_observables(self.wfn)
-        self.gradient = 2 * np.real(np.conj(grad_wfn).T @ h_wfn)
+        
+        ket = self.wfn.copy()
+        bra = h_wfn.copy()
+
+        for idx, name in reversed(list(enumerate(self.param_names))):
+            op_mat = self.operator_mat_dict[name[1:4]]
+            theta = theta_vector[idx]
+            self.gradient[idx] = 2 * np.vdot(bra, op_mat @ ket).real
+            if idx > 0:
+                ket = expm_multiply(-theta * op_mat,ket)
+                bra = expm_multiply(-theta * op_mat,bra)
+
         self.energy = np.real(np.conj(self.wfn).T @ h_wfn)
 
 
