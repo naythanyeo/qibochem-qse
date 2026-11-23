@@ -10,11 +10,12 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from itertools import product
+from itertools import combinations_with_replacement, product
 
 import numpy as np
 from pathlib import Path
 import openfermion
+from tqdm.auto import tqdm
 
 from qibochem.driver.observables import (
     BitmaskObservable,
@@ -271,14 +272,15 @@ class QSE_Computable:
 
         return H, S
 
-    def run_qse_light(self, circuit, protocol, cache_repeats=True) -> tuple[np.ndarray, np.ndarray]:
+    def run_qse_light(self, circuit, protocol, cache_repeats=True, *, progress=False, desc="QSE") -> tuple[np.ndarray, np.ndarray]:
         """
         Lightweight run_qse function that only supports statevector
         Each Hij an Sij term is evaluated individually first
         Reduces RAM significantly, but cannot build global commuting terms
         Individual observable terms are cached, which adds abit to the RAM but
         speeds up the run because of many cache hits overall. 
-        Recommended setting to be true unless really no RAM. 
+        Recommended setting to be true unless really no RAM.
+        Set progress=True to display completed upper-triangular H/S pairs; desc labels the bar.
         """
         # Prevent usage with non statevector calculations 
         # Shots requires global commuting groups for correlated errors
@@ -294,10 +296,9 @@ class QSE_Computable:
 
         cache_observable = {}
 
-        # Outputs 
-        for i, j in product(range(dim), repeat=2):
-            if i > j:
-                continue # Only build upper triangular first
+        pairs = combinations_with_replacement(range(dim), 2)
+        total = dim * (dim + 1) // 2
+        for i, j in tqdm(pairs, total=total, desc=desc, unit="pair", disable=not progress):
 
             # Get S_ij
             S_ij_observables = self._get_S_ij(i, j)
