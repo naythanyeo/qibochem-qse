@@ -271,13 +271,17 @@ class QSE_Computable:
 
         return H, S
 
-    def run_qse_light(self, circuit, protocol) -> tuple[np.ndarray, np.ndarray]:
+    def run_qse_light(self, circuit, protocol, cache_repeats=True) -> tuple[np.ndarray, np.ndarray]:
         """
         Lightweight run_qse function that only supports statevector
         Each Hij an Sij term is evaluated individually first
         Reduces RAM significantly, but cannot build global commuting terms
+        Individual observable terms are cached, which adds abit to the RAM but
+        speeds up the run because of many cache hits overall. 
+        Recommended setting to be true unless really no RAM. 
         """
         # Prevent usage with non statevector calculations 
+        # Shots requires global commuting groups for correlated errors
         if not isinstance(protocol, StateVectorProtocol):
             raise TypeError(
                 "run_qse_light is only supported for Statevector calculations"
@@ -288,6 +292,8 @@ class QSE_Computable:
         H_matrix = np.zeros((dim, dim), dtype=complex)
         S_matrix = np.zeros((dim, dim), dtype=complex)
 
+        cache_observable = {}
+
         # Outputs 
         for i, j in product(range(dim), repeat=2):
             if i > j:
@@ -295,13 +301,28 @@ class QSE_Computable:
 
             # Get S_ij
             S_ij_observables = self._get_S_ij(i, j)
-            S_ij_exp = protocol.evaluate(circuit, S_ij_observables)
+            if cache_repeats == False:
+                S_ij_exp = protocol.evaluate(circuit, S_ij_observables)
+            # If not, then run with external cache
+            else:
+                S_ij_exp, cache_observable = protocol.evaluate_with_external_cache(
+                    circuit, 
+                    S_ij_observables, 
+                    cache_observable
+                )
             S_matrix[i, j] = S_ij_exp
             del S_ij_observables
 
             # Get H_ij
             H_ij_observables = self._get_H_ij(i, j, self.observable)
-            H_ij_exp = protocol.evaluate(circuit, H_ij_observables)
+            if cache_repeats == False:
+                H_ij_exp = protocol.evaluate(circuit, H_ij_observables)
+            else:
+                H_ij_exp, cache_observable = protocol.evaluate_with_external_cache(
+                    circuit, 
+                    H_ij_observables, 
+                    cache_observable
+                )
             H_matrix[i, j] = H_ij_exp
             del H_ij_observables
 

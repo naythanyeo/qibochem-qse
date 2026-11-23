@@ -57,6 +57,32 @@ class StateVectorProtocol:
 
         return format_output(full_observables_data)
 
+    def evaluate_with_external_cache(self, circuit, observables, expectation_cache):
+        """
+        Secondary evaluation function to share the expectation term cache externally 
+        This is mainly used for the qse light function --> can evaluate many matrices
+        terms individually while sharing caches, good tradeoff with RAM and speed
+        """
+        if observables is None:
+            raise ValueError("Specify observables to evaluate.")
+    
+        final_state = get_final_state(circuit)
+        observables = normalise_observables(observables)
+    
+        full_observables_data = defaultdict(dict)
+    
+        for observable_key, observable in observables.items():
+            value = observable.constant
+            for term, coeff in observable.terms.items():
+                if term not in expectation_cache:
+                    expectation_cache[term] = bitmask_expectation(final_state, term)
+    
+                value += coeff * expectation_cache[term]
+    
+            full_observables_data["SV"][observable_key] = value
+    
+        return format_output(full_observables_data), expectation_cache
+
 
 @dataclass
 class BaseMeasurementProtocol:
